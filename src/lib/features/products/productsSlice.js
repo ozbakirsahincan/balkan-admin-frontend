@@ -13,6 +13,25 @@ const getAuthHeaders = () => {
     } : {}
 }
 
+// Helper function to create FormData for file uploads
+const createFormData = (productData, imageFile) => {
+    const formData = new FormData()
+
+    // Add text fields
+    formData.append('name', productData.name)
+    formData.append('description', productData.description || '')
+    formData.append('price', productData.price.toString())
+    formData.append('category_id', productData.category_id.toString())
+    formData.append('is_active', productData.is_active.toString())
+
+    // Add image file if provided
+    if (imageFile && imageFile instanceof File) {
+        formData.append('image', imageFile)
+    }
+
+    return formData
+}
+
 // Async thunks
 export const fetchProducts = createAsyncThunk(
     'products/fetchProducts',
@@ -44,9 +63,17 @@ export const fetchProductById = createAsyncThunk(
 
 export const createProduct = createAsyncThunk(
     'products/createProduct',
-    async (productData, { rejectWithValue }) => {
+    async ({ productData, imageFile }, { rejectWithValue }) => {
         try {
-            const response = await axios.post(`${API_BASE_URL}/api/products`, productData, getAuthHeaders())
+            const formData = createFormData(productData, imageFile)
+
+            const response = await axios.post(`${API_BASE_URL}/api/products`, formData, {
+                ...getAuthHeaders(),
+                headers: {
+                    ...getAuthHeaders().headers,
+                    'Content-Type': 'multipart/form-data',
+                },
+            })
             return response.data
         } catch (error) {
             return rejectWithValue(
@@ -58,9 +85,17 @@ export const createProduct = createAsyncThunk(
 
 export const updateProduct = createAsyncThunk(
     'products/updateProduct',
-    async ({ id, productData }, { rejectWithValue }) => {
+    async ({ id, productData, imageFile }, { rejectWithValue }) => {
         try {
-            const response = await axios.put(`${API_BASE_URL}/api/products/${id}`, productData, getAuthHeaders())
+            const formData = createFormData(productData, imageFile)
+
+            const response = await axios.put(`${API_BASE_URL}/api/products/${id}`, formData, {
+                ...getAuthHeaders(),
+                headers: {
+                    ...getAuthHeaders().headers,
+                    'Content-Type': 'multipart/form-data',
+                },
+            })
             return response.data
         } catch (error) {
             return rejectWithValue(

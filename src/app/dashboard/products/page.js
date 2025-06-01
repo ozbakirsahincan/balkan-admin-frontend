@@ -14,6 +14,7 @@ import { fetchCategories } from '../../../lib/features/categories/categoriesSlic
 import { useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
+import ImageUpload from '../../../components/ImageUpload'
 import {
     Plus,
     Edit,
@@ -22,13 +23,13 @@ import {
     Search,
     Filter
 } from 'lucide-react'
+import Image from 'next/image'
 
 const schema = yup.object({
     name: yup.string().required('Ürün adı gereklidir'),
     description: yup.string(),
     price: yup.number().positive('Fiyat pozitif olmalıdır').required('Fiyat gereklidir'),
     category_id: yup.number().required('Kategori seçimi gereklidir'),
-    stock: yup.number().min(0, 'Stok negatif olamaz').required('Stok miktarı gereklidir'),
     is_active: yup.boolean(),
 })
 
@@ -38,6 +39,7 @@ export default function ProductsPage() {
     const [searchTerm, setSearchTerm] = useState('')
     const [categoryFilter, setCategoryFilter] = useState('')
     const [statusFilter, setStatusFilter] = useState('')
+    const [selectedImage, setSelectedImage] = useState(null)
 
     const dispatch = useDispatch()
     const { products, isLoading, error } = useSelector((state) => state.products)
@@ -56,7 +58,6 @@ export default function ProductsPage() {
             description: '',
             price: '',
             category_id: '',
-            stock: '',
             is_active: true,
         },
     })
@@ -93,17 +94,17 @@ export default function ProductsPage() {
             setValue('description', product.description || '')
             setValue('price', product.price || '')
             setValue('category_id', product.category_id || '')
-            setValue('stock', product.stock || '')
             setValue('is_active', product.is_active)
+            setSelectedImage(product.image_url || null)
         } else {
             reset({
                 name: '',
                 description: '',
                 price: '',
                 category_id: '',
-                stock: '',
                 is_active: true,
             })
+            setSelectedImage(null)
         }
     }
 
@@ -111,26 +112,44 @@ export default function ProductsPage() {
         setIsModalOpen(false)
         setEditingProduct(null)
         reset()
+        setSelectedImage(null)
         dispatch(clearError())
+    }
+
+    const handleImageChange = (file) => {
+        setSelectedImage(file)
     }
 
     const onSubmit = async (data) => {
         try {
             const productData = {
-                ...data,
+                name: data.name,
+                description: data.description || '',
                 price: parseFloat(data.price),
                 category_id: parseInt(data.category_id),
-                stock: parseInt(data.stock),
+                is_active: data.is_active !== undefined ? data.is_active : true,
             }
 
+            console.log('Submitting product data:', productData)
+            console.log('Selected image:', selectedImage)
+
             if (editingProduct) {
-                await dispatch(updateProduct({ id: editingProduct.id, productData })).unwrap()
+                await dispatch(updateProduct({
+                    id: editingProduct.id,
+                    productData,
+                    imageFile: selectedImage
+                })).unwrap()
             } else {
-                await dispatch(createProduct(productData)).unwrap()
+                await dispatch(createProduct({
+                    productData,
+                    imageFile: selectedImage
+                })).unwrap()
             }
             closeModal()
         } catch (error) {
             console.error('Form submission error:', error)
+            // Hata mesajını kullanıcıya göster
+            alert(`Ürün kaydedilemedi: ${error || 'Bilinmeyen hata'}`)
         }
     }
 
@@ -147,6 +166,12 @@ export default function ProductsPage() {
     const getCategoryName = (categoryId) => {
         const category = categories.find(cat => cat.id === categoryId)
         return category ? category.title : 'Kategori bulunamadı'
+    }
+
+    const getImageUrl = (imageUrl) => {
+        if (!imageUrl) return null
+        if (imageUrl.startsWith('http')) return imageUrl
+        return `http://localhost:4000${imageUrl}`
     }
 
     return (
@@ -233,7 +258,7 @@ export default function ProductsPage() {
                                         Fiyat
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Stok
+                                        Resim
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Durum
@@ -262,13 +287,29 @@ export default function ProductsPage() {
                                     filteredProducts.map((product) => (
                                         <tr key={product.id} className="hover:bg-gray-50">
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm font-medium text-gray-900">
-                                                    {product.name}
-                                                </div>
-                                                <div className="text-sm text-gray-500">
-                                                    {product.description && product.description.length > 50
-                                                        ? `${product.description.substring(0, 50)}...`
-                                                        : product.description}
+                                                <div className="flex items-center">
+                                                    {product.image_url && (
+                                                        <div className="flex-shrink-0 h-10 w-10 mr-3">
+                                                            <Image
+                                                                className="h-10 w-10 rounded-lg object-cover"
+                                                                src={getImageUrl(product.image_url)}
+                                                                alt={product.name}
+                                                                onError={(e) => {
+                                                                    e.target.style.display = 'none'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-900">
+                                                            {product.name}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500">
+                                                            {product.description && product.description.length > 50
+                                                                ? `${product.description.substring(0, 50)}...`
+                                                                : product.description}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -278,14 +319,15 @@ export default function ProductsPage() {
                                                 {product.price ? `₺${product.price.toFixed(2)}` : '-'}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.stock > 10
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : product.stock > 0
-                                                        ? 'bg-yellow-100 text-yellow-800'
-                                                        : 'bg-red-100 text-red-800'
-                                                    }`}>
-                                                    {product.stock || 0}
-                                                </span>
+                                                {product.image_url ? (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                        Var
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                        Yok
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${product.is_active
@@ -322,7 +364,7 @@ export default function ProductsPage() {
                 {/* Modal */}
                 {isModalOpen && (
                     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                        <div className="relative top-10 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+                        <div className="relative top-10 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-lg font-medium text-gray-900">
                                     {editingProduct ? 'Ürün Düzenle' : 'Yeni Ürün'}
@@ -385,39 +427,29 @@ export default function ProductsPage() {
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                                            Stok
+                                            Kategori
                                         </label>
-                                        <input
-                                            {...register('stock')}
-                                            type="number"
+                                        <select
+                                            {...register('category_id')}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                                            placeholder="0"
-                                        />
-                                        {errors.stock && (
-                                            <p className="mt-1 text-sm text-red-600">{errors.stock.message}</p>
+                                        >
+                                            <option value="">Kategori seçin</option>
+                                            {categories.map(category => (
+                                                <option key={category.id} value={category.id}>
+                                                    {category.title}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {errors.category_id && (
+                                            <p className="mt-1 text-sm text-red-600">{errors.category_id.message}</p>
                                         )}
                                     </div>
                                 </div>
 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Kategori
-                                    </label>
-                                    <select
-                                        {...register('category_id')}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                                    >
-                                        <option value="">Kategori seçin</option>
-                                        {categories.map(category => (
-                                            <option key={category.id} value={category.id}>
-                                                {category.title}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {errors.category_id && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.category_id.message}</p>
-                                    )}
-                                </div>
+                                <ImageUpload
+                                    value={selectedImage}
+                                    onChange={handleImageChange}
+                                />
 
                                 <div className="flex items-center">
                                     <input
