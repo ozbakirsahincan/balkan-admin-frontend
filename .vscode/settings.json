@@ -1,0 +1,18 @@
+{
+    "sqltools.connections": [
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MySQL",
+            "name": "bbackerei_db",
+            "database": "bbackerei_db",
+            "username": "root",
+            "password": "131415Sah1ncann.."
+        }
+    ]
+}
