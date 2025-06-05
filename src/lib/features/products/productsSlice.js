@@ -14,23 +14,40 @@ const getAuthHeaders = () => {
 }
 
 // Helper function to create FormData for file uploads
+// const createFormData = (productData, imageFile) => {
+//     const formData = new FormData()
+
+//     // Add text fields
+//     formData.append('name', productData.name)
+//     formData.append('description', productData.description || '')
+//     formData.append('price', productData.price.toString())
+//     formData.append('category_id', productData.category_id.toString())
+//     formData.append('is_active', productData.is_active.toString())
+
+//     // Add image file if provided
+//     if (imageFile && imageFile instanceof File) {
+//         formData.append('image', imageFile)
+//     }
+
+//     return formData
+// }
+
 const createFormData = (productData, imageFile) => {
-    const formData = new FormData()
+    const formData = new FormData();
 
-    // Add text fields
-    formData.append('name', productData.name)
-    formData.append('description', productData.description || '')
-    formData.append('price', productData.price.toString())
-    formData.append('category_id', productData.category_id.toString())
-    formData.append('is_active', productData.is_active.toString())
+    // Temel alanları ekle
+    Object.keys(productData).forEach(key => {
+        formData.append(key, productData[key]);
+    });
 
-    // Add image file if provided
-    if (imageFile && imageFile instanceof File) {
-        formData.append('image', imageFile)
+    // Resim dosyasını ekle
+    if (imageFile instanceof File) {
+        formData.append('image', imageFile);
     }
 
-    return formData
+    return formData;
 }
+
 
 // Async thunks
 export const fetchProducts = createAsyncThunk(
@@ -61,28 +78,55 @@ export const fetchProductById = createAsyncThunk(
     }
 )
 
+// export const createProduct = createAsyncThunk(
+//     'products/createProduct',
+//     async ({ productData, imageFile }, { rejectWithValue }) => {
+//         try {
+//             const formData = createFormData(productData, imageFile)
+
+//             const response = await axios.post(`${API_BASE_URL}/api/products`, formData, {
+//                 ...getAuthHeaders(),
+//                 headers: {
+//                     ...getAuthHeaders().headers,
+//                     'Content-Type': 'multipart/form-data',
+//                 },
+//             })
+//             return response.data
+//         } catch (error) {
+//             return rejectWithValue(
+//                 error.response?.data?.error || 'Failed to create product'
+//             )
+//         }
+//     }
+// )
+
 export const createProduct = createAsyncThunk(
-    'products/createProduct',
+    'products/create',
     async ({ productData, imageFile }, { rejectWithValue }) => {
         try {
-            const formData = createFormData(productData, imageFile)
+            const formData = createFormData(productData, imageFile);
 
-            const response = await axios.post(`${API_BASE_URL}/api/products`, formData, {
-                ...getAuthHeaders(),
+            const response = await fetch('http://localhost:4000/api/products', {
+                method: 'POST',
+                body: formData,
                 headers: {
-                    ...getAuthHeaders().headers,
-                    'Content-Type': 'multipart/form-data',
-                },
-            })
-            return response.data
+                    // FormData kullandığımız için Content-Type header'ı otomatik ayarlanacak
+                    ...getAuthHeaders().headers
+                }
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Ürün eklenemedi');
+            }
+
+            const result = await response.json();
+            return result;
         } catch (error) {
-            return rejectWithValue(
-                error.response?.data?.error || 'Failed to create product'
-            )
+            return rejectWithValue(error.message);
         }
     }
-)
-
+);
 export const updateProduct = createAsyncThunk(
     'products/updateProduct',
     async ({ id, productData, imageFile }, { rejectWithValue }) => {

@@ -120,38 +120,43 @@ export default function ProductsPage() {
         setSelectedImage(file)
     }
 
+
     const onSubmit = async (data) => {
         try {
             const productData = {
-                name: data.name,
-                description: data.description || '',
+                name: data.name.trim(),
+                description: data.description ? data.description.trim() : '',
                 price: parseFloat(data.price),
                 category_id: parseInt(data.category_id),
-                is_active: data.is_active !== undefined ? data.is_active : true,
+                is_active: Boolean(data.is_active)
+            };
+
+            // Validation
+            if (!productData.name || !productData.price || !productData.category_id) {
+                throw new Error('Lütfen tüm zorunlu alanları doldurun');
             }
 
-            console.log('Submitting product data:', productData)
-            console.log('Selected image:', selectedImage)
-
-            if (editingProduct) {
-                await dispatch(updateProduct({
-                    id: editingProduct.id,
-                    productData,
-                    imageFile: selectedImage
-                })).unwrap()
-            } else {
-                await dispatch(createProduct({
-                    productData,
-                    imageFile: selectedImage
-                })).unwrap()
+            if (productData.price <= 0) {
+                throw new Error('Fiyat 0\'dan büyük olmalıdır');
             }
-            closeModal()
+
+            const result = await dispatch(createProduct({
+                productData,
+                imageFile: selectedImage instanceof File ? selectedImage : null
+            })).unwrap();
+
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
+            closeModal();
+            // Opsiyonel: Başarı mesajı göster
+            alert('Ürün başarıyla eklendi');
         } catch (error) {
-            console.error('Form submission error:', error)
-            // Hata mesajını kullanıcıya göster
-            alert(`Ürün kaydedilemedi: ${error || 'Bilinmeyen hata'}`)
+            console.error('Form submission error:', error);
+            alert(`Ürün kaydedilemedi: ${error.message || 'Bilinmeyen hata'}`);
         }
-    }
+    };
 
     const handleDelete = async (id) => {
         if (window.confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
@@ -202,22 +207,22 @@ export default function ProductsPage() {
                 )}
 
                 {/* Filters */}
-                <div className="bg-white p-4 rounded-lg shadow">
+                <div className="bg-blend-color-burn p-4 rounded-lg shadow">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-black" />
                             <input
                                 type="text"
                                 placeholder="Ürün ara..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                                className="pl-10 w-full px-3 py-2 text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                             />
                         </div>
                         <select
                             value={categoryFilter}
                             onChange={(e) => setCategoryFilter(e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            className="px-3 py-2 border text-black border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                         >
                             <option value="">Tüm Kategoriler</option>
                             {categories.map(category => (
@@ -229,7 +234,7 @@ export default function ProductsPage() {
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                            className="px-3 py-2 text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                         >
                             <option value="">Tüm Durumlar</option>
                             <option value="active">Aktif</option>
@@ -294,6 +299,10 @@ export default function ProductsPage() {
                                                                 className="h-10 w-10 rounded-lg object-cover"
                                                                 src={getImageUrl(product.image_url)}
                                                                 alt={product.name}
+                                                                width={40}
+                                                                height={40}
+                                                                quality={75}
+                                                                loading='lazy'
                                                                 onError={(e) => {
                                                                     e.target.style.display = 'none'
                                                                 }}
